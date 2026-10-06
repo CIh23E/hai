@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000">
+<title>TikTok</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body {
+    width:100%; height:100dvh; overflow:hidden;
+    background:#000; color:#fff;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    position:fixed; inset:0;
+  }
+
+  #header {
+    position:absolute; top:0; left:0; right:0; height:56px;
+    background:linear-gradient(180deg, rgba(0,0,0,.9), transparent);
+    display:flex; align-items:center; justify-content:center;
+    z-index:100; pointer-events:none;
+  }
+  #header .logo {
+    font-size:22px; font-weight:900; letter-spacing:-.5px;
+    display:flex; align-items:center; gap:4px;
+  }
+  #header .logo .cyan { color:#25f4ee; text-shadow:2px 0 #fe2c55, -2px 0 #25f4ee; }
+  #header .logo .pink { color:#fe2c55; text-shadow:2px 0 #25f4ee, -2px 0 #fe2c55; }
+
+  #feed {
+    height:100%; overflow-y:scroll;
+    scroll-snap-type: y mandatory;
+    scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
+  }
+  #feed::-webkit-scrollbar { display:none; }
+
+  .tt-video {
+    height:100dvh;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    position:relative;
+    background:#000;
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden;
+  }
+
+  .tt-video iframe { width:100%; height:100%; border:none; background:#000; }
+  .tt-video video {
+    width:100%; height:100%;
+    object-fit: contain;
+    background:#000;
+  }
+
+  /* ===== SPEED INDICATOR ===== */
+  .speed-indicator {
+    position: absolute;
+    top: 70px; left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    background: rgba(0,0,0,.75);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s, transform .2s;
+    z-index: 70;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .speed-indicator.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .speed-indicator .arrow {
+    font-size: 12px;
+    animation: arrowPulse .6s infinite;
+  }
+  @keyframes arrowPulse {
+    0%,100% { opacity: 1; transform: translateX(0); }
+    50% { opacity: .4; transform: translateX(3px); }
+  }
+
+  /* ===== TAP EMOJI ===== */
+  .tap-emoji {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.5);
+    font-size: 90px;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 50;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,.6));
+    user-select: none;
+  }
+  .tap-emoji.show { animation: tapPop 0.7s ease-out forwards; }
+  @keyframes tapPop {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+    25%  { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+    50%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+  }
+
+  /* ===== BOTTOM OVERLAY ===== */
+  .tt-bottom {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 20px 14px 70px;
+    background: linear-gradient(0deg, rgba(0,0,0,.85) 0%, rgba(0,0,0,.5) 60%, transparent 100%);
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  .tt-info {
+    max-width: 70%;
+    margin-bottom: 12px;
+    pointer-events: none;
+  }
+  .tt-info .uname {
+    font-size: 15px; font-weight: 700; margin-bottom: 6px;
+    text-shadow: 0 2px 4px rgba(0,0,0,.8);
+  }
+  .tt-info .caption {
+    font-size: 13px; line-height: 1.4;
+    text-shadow: 0 2px 4px rgba(0,0,0,.8);
+    display: -webkit-box; -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical; overflow: hidden;
+  }
+
+  /* ===== SEEK BAR ===== */
+  .tt-progress-wrap {
+    pointer-events: auto;
+    padding: 10px 0 4px;
+    position: relative;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .tt-progress-times {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: rgba(255,255,255,.85);
+    text-shadow: 0 1px 3px rgba(0,0,0,.9);
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 4px;
+    padding: 0 2px;
+    pointer-events: none;
+  }
+
+  .tt-progress-track {
+    position: relative;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    touch-action: none;
+  }
+
+  .tt-progress-bar-bg {
+    position: absolute;
+    left: 0; right: 0;
+    height: 3px;
+    background: rgba(255,255,255,.25);
+    border-radius: 2px;
+    overflow: hidden;
+    transition: height .15s;
+    pointer-events: none;
+  }
+
+  .tt-progress-bar-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    background: #fe2c55;
+    border-radius: 2px;
+    width: 0%;
+    pointer-events: none;
+  }
+
+  .tt-progress-knob {
+    position: absolute;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #fe2c55;
+    box-shadow: 0 0 0 2px rgba(255,255,255,.9);
+    transform: translate(-50%, -50%);
+    top: 50%;
+    left: 0%;
+    transition: transform .15s, left .05s linear;
+    pointer-events: none;
+  }
+
+  .tt-progress-wrap.dragging .tt-progress-bar-bg { height: 6px; }
+  .tt-progress-wrap.dragging .tt-progress-knob { transform: translate(-50%, -50%) scale(1.4); }
+
+  /* ===== AKSI KANAN ===== */
+  .tt-actions {
+    position:absolute; right:10px; bottom:130px;
+    z-index:10;
+    display:flex; flex-direction:column;
+    gap:20px; align-items:center;
+  }
+  .tt-action {
+    display:flex; flex-direction:column; align-items:center;
+    gap:4px; font-size:11px;
+    text-shadow:0 1px 3px rgba(0,0,0,.8);
+    cursor:pointer;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .tt-action .ic {
+    font-size:34px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,.6));
+    transition: transform .15s;
+    pointer-events: none;
+  }
+  .tt-action .cnt { font-weight:600; pointer-events: none; }
+  .tt-action:active .ic { transform:scale(.9); }
+  .tt-action .av {
+    width:44px; height:44px; border-radius:50%;
+    background:linear-gradient(135deg,#fe2c55,#25f4ee);
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px; font-weight:700;
+    border:2px solid #fff;
+    pointer-events: none;
+  }
+
+  #bottombar {
+    position:absolute; bottom:0; left:0; right:0;
+    height:60px;
+    background:#000;
+    border-top:1px solid #1a1a1a;
+    display:flex; justify-content:space-around; align-items:center;
+    z-index:100;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .bn-btn {
+    flex:1; display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    gap:3px; color:#8e8e93; font-size:10px;
+    padding:8px 0;
+  }
+  .bn-btn.active { color:#fff; }
+  .bn-btn .ic { font-size:20px; }
+
+  .tt-placeholder {
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    text-align:center; padding:30px;
+    color:#666;
+  }
+  .tt-placeholder .big { font-size:60px; margin-bottom:16px; }
+  .tt-placeholder .msg { font-size:14px; line-height:1.6; }
+  .tt-placeholder .msg code {
+    background:#222; color:#25f4ee; padding:2px 6px;
+    border-radius:4px; font-size:12px;
+  }
+
+  /* PANEL KOMENTAR */
+  #commentSheet {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    height: 70dvh;
+    background: #1c1c1e;
+    border-radius: 16px 16px 0 0;
+    z-index: 500;
+    transform: translateY(100%);
+    transition: transform .3s cubic-bezier(.2,1,.3,1);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 -10px 40px rgba(0,0,0,.6);
+  }
+  #commentSheet.show { transform: translateY(0); }
+
+  #commentSheet .grabber {
+    width: 40px; height: 4px;
+    background: #444;
+    border-radius: 2px;
+    margin: 8px auto 0;
+    flex-shrink: 0;
+  }
+
+  .cs-header {
+    display: flex; align-items: center;
+    padding: 12px 16px 8px;
+    border-bottom: 1px solid #2a2a2a;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .cs-header .cs-title {
+    flex: 1; text-align: center;
+    font-size: 14px; font-weight: 600;
+  }
+  .cs-header .cs-close {
+    position: absolute;
+    right: 12px; top: 50%;
+    transform: translateY(-50%);
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    color: #aaa; font-size: 22px;
+    cursor: pointer;
+    border-radius: 50%;
+  }
+  .cs-header .cs-close:active { background: #2a2a2a; }
+
+  .cs-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px 20px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .cs-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px 0;
+    align-items: flex-start;
+  }
+  .cs-avatar {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 700; color: #fff;
+    flex-shrink: 0;
+  }
+  .cs-body { flex: 1; min-width: 0; }
+  .cs-name {
+    font-size: 12px; color: #aaa;
+    margin-bottom: 4px; font-weight: 500;
+  }
+  .cs-text {
+    font-size: 14px; line-height: 1.4;
+    word-break: break-word; color: #fff;
+  }
+  .cs-meta {
+    font-size: 11px; color: #666;
+    margin-top: 6px;
+    display: flex; gap: 12px;
+  }
+  .cs-like {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 2px;
+    color: #666; font-size: 11px;
+    flex-shrink: 0;
+    cursor: pointer;
+    padding: 4px 0;
+    min-width: 32px;
+  }
+  .cs-like .heart { font-size: 16px; }
+  .cs-like .heart.liked { color: #fe2c55; }
+  .cs-like .cnt { font-size: 10px; }
+
+  .cs-input-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-top: 1px solid #2a2a2a;
+    background: #1c1c1e;
+    flex-shrink: 0;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+  .cs-input {
+    flex: 1;
+    background: #2a2a2a;
+    border: none;
+    border-radius: 20px;
+    padding: 10px 16px;
+    color: #fff;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+  }
+  .cs-input::placeholder { color: #666; }
+
+  #sheetOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.4);
+    z-index: 400;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .3s;
+  }
+  #sheetOverlay.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div class="logo">
+    <span class="cyan">Tik</span><span class="pink">Tok</span>
+  </div>
+</div>
+
+<div id="feed"></div>
+
+<div id="bottombar">
+  <div class="bn-btn active"><div class="ic">🏠</div>Home</div>
+  <div class="bn-btn"><div class="ic">🔍</div>Discover</div>
+  <div class="bn-btn"><div class="ic">➕</div></div>
+  <div class="bn-btn"><div class="ic">📥</div>Inbox</div>
+  <div class="bn-btn"><div class="ic">👤</div>Profile</div>
+</div>
+
+<div id="sheetOverlay"></div>
+
+<div id="commentSheet">
+  <div class="grabber"></div>
+  <div class="cs-header">
+    <div class="cs-title" id="csTitle">Komentar</div>
+    <div class="cs-close" id="csClose">✕</div>
+  </div>
+  <div class="cs-list" id="csList"></div>
+  <div class="cs-input-row">
+    <input type="text" class="cs-input" id="csInput" placeholder="Tambah komentar...">
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   ⬇️ 7 VIDEO — GANTI JUDULNYA KALAU MAU ⬇️
+   ========================================================= */
+
+const TIKTOK_VIDEOS = [
+  {
+    url: "https://www.image2url.com/r2/default/files/1791149463820-3d8c6c6a-2e83-4c93-aaaa-1e3006bdeda2.mp4",
+    user: "@username1",
+    caption: "Video pertama 🔥",
+    likes: "12.4K",
+    comments: "247",
+    shares: "89"
+  },
+  {
+    url: "https://www.image2url.com/r2/default/files/1791148691769-8264839a-d843-44a3-9615-86a33ff51e8b.mp4",
+    user: "@username2",
+    caption: "Video kedua ✨",
+    likes: "8.2K",
+    comments: "156",
+    shares: "42"
+  },
+  {
+    url: "https://www.image2url.com/r2/default/videos/1791161405454-e4839185-0a2d-4a75-943d-0e2cc28f3526.mp4",
+    user: "@username3",
+    caption: "Video ketiga 💫",
+    likes: "25.1K",
+    comments: "892",
+    shares: "234"
+  },
+  {
+    url: "https://www.image2url.com/r2/default/videos/1791261861698-65304ffd-42d3-43da-a9e0-f4b4ab3a9656.mp4",
+    user: "@username4",
+    caption: "Video keempat 🎬",
+    likes: "15.7K",
+    comments: "523",
+    shares: "178"
+  },
+  {
+    url: "https://www.image2url.com/r2/default/videos/1791262075588-61656213-60f9-4eb2-8406-8a988e2c00dc.mp4",
+    user: "@username5",
+    caption: "Video kelima 🌟",
+    likes: "9.8K",
+    comments: "312",
+    shares: "87"
+  },
+  {
+    url: "https://www.image2url.com/r2/default/videos/1791262142532-e09eb355-bb7e-4a38-8a38-ebb35c286b68.mp4",
+    user: "@username6",
+    caption: "Video keenam 💥",
+    likes: "18.3K",
+    comments: "678",
+    shares: "201"
+  },
+  {
+    url: "https://www.image2url.com/r2/default/videos/1791262216902-fb81e83b-f5db-4cbe-b94e-4e05da174c99.mp4",
+    user: "@username7",
+    caption: "Video ketujuh 🎉",
+    likes: "22.5K",
+    comments: "945",
+    shares: "312"
+  },
+];
+
+/* =========================================================
+   ⬆️ SAMPAI SINI AJA ⬆️
+   ========================================================= */
+
+const COMMENTS_BY_VIDEO = {
+  0: [
+    { name: "userrandom123", text: "Ih gemes bgt dah pengen juga jir", likes: "12.4K", c: "#ff6b6b" },
+    { name: "bukan_aku99", text: "ini sih udah level dewa 🐐", likes: "8.2K", c: "#4d96ff" },
+    { name: "kamu_yg_disana", text: "kak, tutorialnya dong 🙏", likes: "5.6K", c: "#f5576c" },
+    { name: "anak_medsos.id", text: "like dulu baru nonton ✅", likes: "3.8K", c: "#43e97b" },
+    { name: "wibu_sejati", text: "gilaa keren banget sumpah", likes: "2.9K", c: "#fdd835" },
+    { name: "rahasia.umum", text: "yang nonton sambil rebahan mana suaranya 🖐️", likes: "2.1K", c: "#a855f7" },
+    { name: "spill_dong_kak", text: "kak bikin yang kayak gini lagi dong", likes: "1.8K", c: "#00bcd4" },
+    { name: "mabar_yuk24", text: "wkwkwk ngakak gw liat ini 😂", likes: "1.5K", c: "#ff9500" },
+    { name: "jomblo_happy", text: "single tp bahagia 🗿", likes: "1.2K", c: "#8b5cf6" },
+    { name: "auto_save.mp4", text: "save dulu ah buat nanti 📌", likes: "980", c: "#10b981" },
+    { name: "gapunya_akun", text: "kok bisa sih kayak gitu 😭", likes: "876", c: "#ef4444" },
+    { name: "user29485123", text: "yang like komen ini semoga rezekinya lancar 🤲", likes: "654", c: "#3b82f6" },
+    { name: "dari_fyp", text: "dateng dari FYP 🚀", likes: "543", c: "#f97316" },
+    { name: "kopi_dulu", text: "sambil ngopi mantap ☕", likes: "421", c: "#92400e" },
+    { name: "bukan_tuyul", text: "komen ke 100 ✅", likes: "312", c: "#06b6d4" },
+    { name: "pemula_juga", text: "bisa minta tolong ajarin ga?", likes: "245", c: "#e11d48" },
+    { name: "setia_menonton", text: "subscribe channel gue ya balik 🙏", likes: "198", c: "#7c3aed" },
+    { name: "ggwp_single", text: "GG banget sih ini 🎮", likes: "165", c: "#0ea5e9" },
+    { name: "jangan_lupa_like", text: "jangan lupa like & komennya bro 👍", likes: "142", c: "#22c55e" },
+    { name: "nonton_terus", text: "sampe jam segini masih nonton 🕐", likes: "98", c: "#f59e0b" },
+  ],
+  1: [
+    { name: "userrandom123", text: "keren juga nih 🔥", likes: "542", c: "#ff6b6b" },
+    { name: "bukan_aku99", text: "gak nyangka bisa gini", likes: "312", c: "#4d96ff" },
+    { name: "anak_medsos.id", text: "mantap 👍", likes: "145", c: "#43e97b" },
+  ],
+  2: [
+    { name: "wibu_sejati", text: "ini sih wajib tonton", likes: "892", c: "#fdd835" },
+    { name: "spill_dong_kak", text: "bagus banget kak", likes: "467", c: "#00bcd4" },
+    { name: "mabar_yuk24", text: "lanjut terus ya 💪", likes: "234", c: "#ff9500" },
+  ],
+  3: [
+    { name: "auto_save.mp4", text: "sumpah keren parah", likes: "721", c: "#10b981" },
+    { name: "dari_fyp", text: "fyp nih pasti 🚀", likes: "445", c: "#f97316" },
+  ],
+  4: [
+    { name: "kopi_dulu", text: "sambil rebahan mantap ☕", likes: "312", c: "#92400e" },
+    { name: "ggwp_single", text: "GG 🎮", likes: "198", c: "#0ea5e9" },
+  ],
+  5: [
+    { name: "wibu_sejati", text: "level dewa 🐐", likes: "1.2K", c: "#fdd835" },
+    { name: "spill_dong_kak", text: "tutorialnya dong kak 🙏", likes: "678", c: "#00bcd4" },
+    { name: "mabar_yuk24", text: "auto like ✅", likes: "456", c: "#ff9500" },
+    { name: "bukan_tuyul", text: "komen ke 200 🎉", likes: "234", c: "#06b6d4" },
+  ],
+  6: [
+    { name: "userrandom123", text: "gilaaa bagus bgt 😍", likes: "3.2K", c: "#ff6b6b" },
+    { name: "kamu_yg_disana", text: "save dulu ah 📌", likes: "1.8K", c: "#f5576c" },
+    { name: "anak_medsos.id", text: "keren parah 🔥", likes: "1.2K", c: "#43e97b" },
+    { name: "rahasia.umum", text: "yang nonton sambil rebahan 🖐️", likes: "876", c: "#a855f7" },
+    { name: "dari_fyp", text: "dateng dari FYP 🚀", likes: "543", c: "#f97316" },
+  ],
+};
+
+let currentCommentVideoIdx = -1;
+
+function isValidUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  if (url === 'Url' || url.trim() === '') return false;
+  if (!/^https?:\/\//i.test(url)) return false;
+  return true;
+}
+function extractVideoId(url) {
+  if (!isValidUrl(url)) return null;
+  const m = url.match(/\/video\/(\d+)/);
+  if (m) return m[1];
+  const m2 = url.match(/\/embed\/v2\/(\d+)/);
+  if (m2) return m2[1];
+  return null;
+}
+function isMp4Link(url) {
+  if (!isValidUrl(url)) return false;
+  return /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(url);
+}
+
+function fmtTime(sec) {
+  if (!sec || isNaN(sec) || !isFinite(sec)) return '0:00';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${String(s).padStart(2,'0')}`;
+}
+
+const feed = document.getElementById('feed');
+
+function videoHtml(v, idx) {
+  const videoId = extractVideoId(v.url);
+  let mediaHtml;
+
+  if (videoId) {
+    mediaHtml = `
+      <iframe
+        src="https://www.tiktok.com/embed/v2/${videoId}"
+        allow="autoplay; encrypted-media"
+        allowfullscreen
+        scrolling="no">
+      </iframe>
+    `;
+  } else if (isMp4Link(v.url)) {
+    mediaHtml = `
+      <video
+        src="${v.url}"
+        playsinline
+        webkit-playsinline
+        loop
+        muted
+        preload="metadata">
+      </video>
+    `;
+  } else {
+    mediaHtml = `
+      <div class="tt-placeholder">
+        <div class="big">🎵</div>
+        <div class="msg">
+          URL belum diisi.<br>
+          Ganti <code>"Url"</code> di kode<br>
+          dengan link TikTok / MP4.
+        </div>
+      </div>
+    `;
+  }
+
+  const userInitial = (v.user || '@u').replace('@','').charAt(0).toUpperCase();
+  const commentCount = (COMMENTS_BY_VIDEO[idx] || []).length;
+  const displayCommentCount = commentCount > 0 ? commentCount : (v.comments || '0');
+
+  return `
+    <div class="tt-video" data-idx="${idx}">
+      ${mediaHtml}
+      <div class="speed-indicator">
+        <span class="arrow">▶▶</span>
+        <span>2x</span>
+      </div>
+      <div class="tap-emoji"></div>
+
+      <div class="tt-bottom">
+        <div class="tt-info">
+          <div class="uname">${v.user || '@user'}</div>
+          <div class="caption">${v.caption || v.title || ''}</div>
+        </div>
+
+        <div class="tt-progress-wrap" data-progress>
+          <div class="tt-progress-times">
+            <span data-cur-time>0:00</span>
+            <span data-total-time>0:00</span>
+          </div>
+          <div class="tt-progress-track">
+            <div class="tt-progress-bar-bg">
+              <div class="tt-progress-bar-fill" data-fill></div>
+            </div>
+            <div class="tt-progress-knob" data-knob></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tt-actions">
+        <div class="tt-action">
+          <div class="av">${userInitial}</div>
+        </div>
+        <div class="tt-action" data-like>
+          <div class="ic">🤍</div>
+          <div class="cnt">${v.likes || '0'}</div>
+        </div>
+        <div class="tt-action" data-comment="${idx}">
+          <div class="ic">💬</div>
+          <div class="cnt">${displayCommentCount}</div>
+        </div>
+        <div class="tt-action">
+          <div class="ic">↗️</div>
+          <div class="cnt">${v.shares || '0'}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function buildBatch() {
+  return TIKTOK_VIDEOS.map((v, i) => videoHtml(v, i)).join('');
+}
+function appendVideos() {
+  feed.insertAdjacentHTML('beforeend', buildBatch());
+  bindActions();
+}
+
+/* =========================================================
+   BIND ACTIONS
+   ========================================================= */
+function bindActions() {
+  // LIKE BUTTON
+  feed.querySelectorAll('[data-like]').forEach(el => {
+    if (el.dataset.bound) return;
+    el.dataset.bound = '1';
+
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      toggleLike(el);
+    });
+    el.addEventListener('touchstart', (e) => {
+      e.stopPropagation();
+    }, { passive: true });
+    el.addEventListener('touchend', (e) => {
+      e.stopPropagation();
+    }, { passive: true });
+  });
+
+  // COMMENT BUTTON
+  feed.querySelectorAll('[data-comment]').forEach(el => {
+    if (el.dataset.bound) return;
+    el.dataset.bound = '1';
+
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const idx = parseInt(el.dataset.comment);
+      openComments(idx);
+    });
+    el.addEventListener('touchstart', (e) => {
+      e.stopPropagation();
+    }, { passive: true });
+    el.addEventListener('touchend', (e) => {
+      e.stopPropagation();
+    }, { passive: true });
+  });
+
+  // VIDEO EVENTS
+  feed.querySelectorAll('.tt-video').forEach(wrap => {
+    if (wrap.dataset.videoBound) return;
+    wrap.dataset.videoBound = '1';
+
+    const videoEl = wrap.querySelector('video');
+    if (!videoEl) return;
+
+    const fill = wrap.querySelector('[data-fill]');
+    const knob = wrap.querySelector('[data-knob]');
+    const curTimeEl = wrap.querySelector('[data-cur-time]');
+    const totalTimeEl = wrap.querySelector('[data-total-time]');
+
+    videoEl.addEventListener('loadedmetadata', () => {
+      if (totalTimeEl) totalTimeEl.textContent = fmtTime(videoEl.duration);
+    });
+
+    function updateProgress() {
+      if (!videoEl.duration) return;
+      const pct = (videoEl.currentTime / videoEl.duration) * 100;
+      if (fill) fill.style.width = pct + '%';
+      if (knob) knob.style.left = pct + '%';
+      if (curTimeEl) curTimeEl.textContent = fmtTime(videoEl.currentTime);
+    }
+    videoEl.addEventListener('timeupdate', updateProgress);
+    videoEl.addEventListener('progress', updateProgress);
+
+    const progressWrap = wrap.querySelector('[data-progress]');
+    if (progressWrap) setupSeek(progressWrap, videoEl);
+  });
+}
+
+/* =========================================================
+   SEEK BAR (drag)
+   ========================================================= */
+function setupSeek(progressWrap, videoEl) {
+  const track = progressWrap.querySelector('.tt-progress-track');
+  if (!track) return;
+
+  let dragging = false;
+  let wasPlayingBeforeSeek = false;
+
+  function getPct(clientX) {
+    const rect = track.getBoundingClientRect();
+    let x = clientX - rect.left;
+    x = Math.max(0, Math.min(x, rect.width));
+    return x / rect.width;
+  }
+
+  function applySeek(clientX) {
+    if (!videoEl.duration) return;
+    const pct = getPct(clientX);
+    try { videoEl.currentTime = pct * videoEl.duration; } catch(e) {}
+    const fill = progressWrap.querySelector('[data-fill]');
+    const knob = progressWrap.querySelector('[data-knob]');
+    const curTimeEl = progressWrap.querySelector('[data-cur-time]');
+    if (fill) fill.style.width = (pct * 100) + '%';
+    if (knob) knob.style.left = (pct * 100) + '%';
+    if (curTimeEl) curTimeEl.textContent = fmtTime(pct * videoEl.duration);
+  }
+
+  function start(e) {
+    e.stopPropagation();
+    e.preventDefault();
+    dragging = true;
+    progressWrap.classList.add('dragging');
+    wasPlayingBeforeSeek = !videoEl.paused;
+    if (wasPlayingBeforeSeek) videoEl.pause();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    applySeek(clientX);
+  }
+
+  function move(e) {
+    if (!dragging) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    applySeek(clientX);
+  }
+
+  function end(e) {
+    if (!dragging) return;
+    dragging = false;
+    progressWrap.classList.remove('dragging');
+    if (wasPlayingBeforeSeek) {
+      videoEl.play().catch(() => {});
+    }
+  }
+
+  progressWrap.addEventListener('mousedown', start);
+  window.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+
+  track.addEventListener('touchstart', start, { passive: false });
+  track.addEventListener('touchmove', move, { passive: false });
+  track.addEventListener('touchend', end);
+  track.addEventListener('touchcancel', end);
+}
+
+/* =========================================================
+   LIKE TOGGLE
+   ========================================================= */
+function toggleLike(btn) {
+  const ic = btn.querySelector('.ic');
+  const cnt = btn.querySelector('.cnt');
+  const isLiked = ic.textContent === '❤️';
+  ic.textContent = isLiked ? '🤍' : '❤️';
+  const n = parseLikeCount(cnt.textContent);
+  cnt.textContent = formatLikeCount(n + (isLiked ? -1 : 1));
+  if (navigator.vibrate) navigator.vibrate(20);
+}
+
+/* ===== INIT ===== */
+appendVideos();
+
+/* =========================================================
+   AUTO-PLAY
+   ========================================================= */
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    const videoEl = entry.target.querySelector('video');
+    if (!videoEl) return;
+
+    if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
+      try { videoEl.currentTime = 0; } catch(e) {}
+      videoEl.muted = false;
+      videoEl.play().catch(() => {
+        videoEl.muted = true;
+        videoEl.play().catch(() => {});
+      });
+    } else {
+      videoEl.pause();
+      videoEl.playbackRate = 1;
+      try { videoEl.currentTime = 0; } catch(e) {}
+    }
+  });
+}, { root: feed, threshold: [0.6] });
+
+function observeAllVideos() {
+  feed.querySelectorAll('.tt-video').forEach(el => {
+    if (el.dataset.observed) return;
+    el.dataset.observed = '1';
+    observer.observe(el);
+  });
+}
+observeAllVideos();
+
+/* =========================================================
+   INFINITE SCROLL 2 ARAH
+   ========================================================= */
+let isLoadingMore = false;
+let isPrepending = false;
+
+feed.addEventListener('scroll', () => {
+  const top = feed.scrollTop;
+  const bottom = top + feed.clientHeight;
+  const total = feed.scrollHeight;
+
+  if (bottom > total - (window.innerHeight * 1.5)) {
+    if (!isLoadingMore) {
+      isLoadingMore = true;
+      appendVideos();
+      observeAllVideos();
+      setTimeout(() => { isLoadingMore = false; }, 150);
+    }
+  }
+
+  if (top < window.innerHeight * 1.5 && !isPrepending) {
+    isPrepending = true;
+    const oldHeight = feed.scrollHeight;
+    const oldTop = feed.scrollTop;
+    feed.style.scrollSnapType = 'none';
+    feed.insertAdjacentHTML('afterbegin', buildBatch());
+    const newHeight = feed.scrollHeight;
+    feed.scrollTop = oldTop + (newHeight - oldHeight);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        feed.style.scrollSnapType = 'y mandatory';
+        isPrepending = false;
+      });
+    });
+    bindActions();
+    observeAllVideos();
+  }
+}, { passive: true });
+
+/* ===== TAP EMOJI ===== */
+function showTapEmoji(videoEl, emoji) {
+  const wrap = videoEl.closest('.tt-video');
+  if (!wrap) return;
+  const emojiEl = wrap.querySelector('.tap-emoji');
+  if (!emojiEl) return;
+  emojiEl.classList.remove('show');
+  emojiEl.textContent = emoji;
+  void emojiEl.offsetWidth;
+  emojiEl.classList.add('show');
+}
+
+/* ===== SPEED INDICATOR ===== */
+function showSpeedIndicator(wrap, show) {
+  const el = wrap.querySelector('.speed-indicator');
+  if (!el) return;
+  if (show) el.classList.add('show');
+  else el.classList.remove('show');
+}
+
+/* =========================================================
+   TAP & LONG PRESS
+   ========================================================= */
+const LONG_PRESS_DELAY = 250;
+
+let longPressTimer = null;
+let longPressActive = false;
+let currentPressWrap = null;
+let pressStartY = 0;
+let pressStartX = 0;
+let isScrolling = false;
+let pressStartTime = 0;
+
+function onPressStart(e) {
+  if (e.target.closest('.tt-action')) return;
+  if (e.target.closest('.tt-progress-wrap')) return;
+
+  const wrap = e.target.closest('.tt-video');
+  if (!wrap) return;
+  const videoEl = wrap.querySelector('video');
+  if (!videoEl) return;
+
+  currentPressWrap = wrap;
+  longPressActive = false;
+  isScrolling = false;
+  pressStartTime = Date.now();
+
+  const touch = e.touches ? e.touches[0] : e;
+  pressStartY = touch.clientY;
+  pressStartX = touch.clientX;
+
+  clearTimeout(longPressTimer);
+  longPressTimer = setTimeout(() => {
+    longPressActive = true;
+    videoEl.playbackRate = 2;
+    showSpeedIndicator(wrap, true);
+    if (navigator.vibrate) navigator.vibrate(30);
+  }, LONG_PRESS_DELAY);
+}
+
+function onPressEnd(e) {
+  clearTimeout(longPressTimer);
+  const pressDuration = Date.now() - pressStartTime;
+
+  if (currentPressWrap) {
+    const videoEl = currentPressWrap.querySelector('video');
+    if (videoEl) videoEl.playbackRate = 1;
+    showSpeedIndicator(currentPressWrap, false);
+  }
+
+  if (longPressActive) {
+    longPressActive = false;
+    currentPressWrap = null;
+    return;
+  }
+
+  if (isScrolling) {
+    currentPressWrap = null;
+    return;
+  }
+
+  const wrap = currentPressWrap;
+  currentPressWrap = null;
+  if (!wrap) return;
+  const videoEl = wrap.querySelector('video');
+  if (!videoEl) return;
+
+  if (pressDuration < LONG_PRESS_DELAY) {
+    if (videoEl.paused) {
+      videoEl.muted = false;
+      videoEl.play().catch(() => {});
+    } else {
+      videoEl.pause();
+      showTapEmoji(videoEl, '▶️');
+    }
+  }
+}
+
+function onPressMove(e) {
+  if (!currentPressWrap) return;
+  const touch = e.touches ? e.touches[0] : e;
+  const dy = Math.abs(touch.clientY - pressStartY);
+  const dx = Math.abs(touch.clientX - pressStartX);
+
+  if (dy > 10 || dx > 10) {
+    isScrolling = true;
+    clearTimeout(longPressTimer);
+    if (currentPressWrap) {
+      const videoEl = currentPressWrap.querySelector('video');
+      if (videoEl) videoEl.playbackRate = 1;
+      showSpeedIndicator(currentPressWrap, false);
+    }
+    currentPressWrap = null;
+  }
+}
+
+/* =========================================================
+   LISTENER (skip mouse kalau abis touch)
+   ========================================================= */
+let lastTouchTime = 0;
+const TOUCH_MOUSE_DELAY = 700;
+
+function isSyntheticMouse() {
+  return Date.now() - lastTouchTime < TOUCH_MOUSE_DELAY;
+}
+
+feed.addEventListener('touchstart', (e) => {
+  lastTouchTime = Date.now();
+  onPressStart(e);
+}, { passive: true });
+
+feed.addEventListener('touchend', (e) => {
+  lastTouchTime = Date.now();
+  onPressEnd(e);
+});
+
+feed.addEventListener('touchcancel', (e) => {
+  lastTouchTime = Date.now();
+  onPressEnd(e);
+});
+
+feed.addEventListener('touchmove', (e) => {
+  lastTouchTime = Date.now();
+  onPressMove(e);
+}, { passive: true });
+
+feed.addEventListener('mousedown', (e) => {
+  if (isSyntheticMouse()) return;
+  onPressStart(e);
+});
+
+feed.addEventListener('mouseup', (e) => {
+  if (isSyntheticMouse()) return;
+  onPressEnd(e);
+});
+
+feed.addEventListener('mouseleave', (e) => {
+  if (isSyntheticMouse()) return;
+  onPressEnd(e);
+});
+
+feed.addEventListener('mousemove', (e) => {
+  if (isSyntheticMouse()) return;
+  onPressMove(e);
+});
+
+/* =========================================================
+   PANEL KOMENTAR
+   ========================================================= */
+const sheet = document.getElementById('commentSheet');
+const overlay = document.getElementById('sheetOverlay');
+const csList = document.getElementById('csList');
+const csTitle = document.getElementById('csTitle');
+
+function openComments(videoIdx) {
+  currentCommentVideoIdx = videoIdx;
+  const list = COMMENTS_BY_VIDEO[videoIdx] || [];
+  csTitle.textContent = list.length + ' komentar';
+
+  if (list.length === 0) {
+    csList.innerHTML = `<div style="text-align:center;color:#666;padding:40px 20px;font-size:14px">Belum ada komentar.<br>Jadilah yang pertama!</div>`;
+  } else {
+    csList.innerHTML = list.map((c, i) => `
+      <div class="cs-item">
+        <div class="cs-avatar" style="background:${c.c || '#666'}">${c.name.charAt(0).toUpperCase()}</div>
+        <div class="cs-body">
+          <div class="cs-name">${c.name}</div>
+          <div class="cs-text">${c.text}</div>
+          <div class="cs-meta"><span>${getRandomTime()}</span><span>Balas</span></div>
+        </div>
+        <div class="cs-like" data-like-comment="${videoIdx}-${i}">
+          <div class="heart">🤍</div>
+          <div class="cnt">${c.likes || '0'}</div>
+        </div>
+      </div>
+    `).join('');
+
+    csList.querySelectorAll('[data-like-comment]').forEach(el => {
+      el.addEventListener('click', () => {
+        const heart = el.querySelector('.heart');
+        const cnt = el.querySelector('.cnt');
+        const liked = heart.classList.toggle('liked');
+        heart.textContent = liked ? '❤️' : '🤍';
+        const n = parseLikeCount(cnt.textContent);
+        cnt.textContent = formatLikeCount(n + (liked ? 1 : -1));
+      });
+    });
+  }
+
+  sheet.classList.add('show');
+  overlay.classList.add('show');
+  feed.querySelectorAll('video').forEach(v => {
+    v.pause();
+    v.playbackRate = 1;
+  });
+}
+
+function closeComments() {
+  sheet.classList.remove('show');
+  overlay.classList.remove('show');
+}
+
+document.getElementById('csClose').addEventListener('click', closeComments);
+overlay.addEventListener('click', closeComments);
+
+function parseLikeCount(str) {
+  str = String(str).trim();
+  if (str.endsWith('K')) return parseFloat(str) * 1000;
+  if (str.endsWith('M')) return parseFloat(str) * 1000000;
+  return parseFloat(str) || 0;
+}
+function formatLikeCount(n) {
+  if (n >= 1000000) return (n / 1000000).toFixed(1).replace('.0','') + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1).replace('.0','') + 'K';
+  return String(Math.round(n));
+}
+function getRandomTime() {
+  const times = ['1m', '2m', '5m', '12m', '30m', '1j', '2j', '5j', '1h', '2h', '1d', '2d', '3d', '1mgg'];
+  return times[Math.floor(Math.random() * times.length)];
+}
+
+const csInput = document.getElementById('csInput');
+csInput.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const val = csInput.value.trim();
+  if (!val) return;
+  const idx = currentCommentVideoIdx;
+  if (idx < 0) return;
+  if (!COMMENTS_BY_VIDEO[idx]) COMMENTS_BY_VIDEO[idx] = [];
+  COMMENTS_BY_VIDEO[idx].unshift({ name: "@kamu", text: val, likes: "0", c: "#fe2c55" });
+  csInput.value = '';
+  openComments(idx);
+  csList.scrollTop = 0;
+  updateCommentCount(idx);
+});
+
+function updateCommentCount(videoIdx) {
+  const newCount = (COMMENTS_BY_VIDEO[videoIdx] || []).length;
+  feed.querySelectorAll(`[data-comment="${videoIdx}"] .cnt`).forEach(el => {
+    el.textContent = newCount;
+  });
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    feed.querySelectorAll('video').forEach(v => {
+      v.pause();
+      v.playbackRate = 1;
+    });
+  }
+});
+</script>
+</body>
+</html>
